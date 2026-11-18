@@ -10,6 +10,7 @@ import com.ashish.filetax.onboarding.model.Question
 import com.ashish.filetax.onboarding.model.QuestionId
 import com.ashish.filetax.onboarding.model.ResidentialStatus
 import com.ashish.filetax.onboarding.model.SpecialSituation
+import com.ashish.filetax.onboarding.model.TotalIncomeBand
 import com.ashish.filetax.onboarding.model.TaxYear
 
 object OnboardingQuestions {
@@ -123,10 +124,29 @@ object OnboardingQuestions {
     private val housePropertyCount = Question.SingleChoice(
         id = QuestionId.HOUSE_PROPERTY_COUNT,
         title = "How many houses or flats do you own?",
-        subtitle = "Count the one you live in, the ones you rent out, and anything you own jointly.",
+        subtitle = "Count the one you live in, the ones you rent out, and anything you own jointly. Two is the new ceiling for the short forms this year.",
         choices = listOf(
             Choice(key = HousePropertyCount.ONE.name, label = "One"),
-            Choice(key = HousePropertyCount.MORE_THAN_ONE.name, label = "Two or more")
+            Choice(
+                key = HousePropertyCount.TWO.name,
+                label = "Two",
+                hint = "From AY ${TaxYear.ASSESSMENT_YEAR} two houses still fit in ITR-1 and ITR-4. Last year they did not."
+            ),
+            Choice(key = HousePropertyCount.MORE_THAN_TWO.name, label = "Three or more")
+        )
+    )
+
+    private val presumptiveTurnoverLimit = Question.SingleChoice(
+        id = QuestionId.PRESUMPTIVE_TURNOVER_LIMIT,
+        title = "Did you stay inside the presumptive limits?",
+        subtitle = "Section 44AD allows sales up to ₹2 crore, or ₹3 crore if no more than 5% of your receipts and payments were in cash. Section 44ADA allows fees up to ₹50 lakh, or ₹75 lakh on the same cash condition. Section 44AE is for up to ten goods vehicles.",
+        choices = listOf(
+            Choice(key = BooleanChoice.NO, label = "Yes, I stayed inside them"),
+            Choice(
+                key = BooleanChoice.YES,
+                label = "No, I went over",
+                hint = "Then the presumptive route is closed for the year: you declare your real profit, and an audit may be due."
+            )
         )
     )
 
@@ -180,11 +200,16 @@ object OnboardingQuestions {
 
     private val totalIncomeBand = Question.SingleChoice(
         id = QuestionId.TOTAL_INCOME_BAND,
-        title = "Did you earn more than ₹50 lakh in the year?",
-        subtitle = "Everything you ticked, added up for the whole year.",
+        title = "How much did you earn in the year, all together?",
+        subtitle = "Everything you ticked, added up. ₹50 lakh is where the short forms stop, and ₹1 crore is where the return starts asking for your assets.",
         choices = listOf(
-            Choice(key = BooleanChoice.NO, label = "No, ₹50 lakh or less"),
-            Choice(key = BooleanChoice.YES, label = "Yes, more than ₹50 lakh")
+            Choice(key = TotalIncomeBand.UP_TO_FIFTY_LAKH.name, label = "₹50 lakh or less"),
+            Choice(key = TotalIncomeBand.FIFTY_LAKH_TO_ONE_CRORE.name, label = "Between ₹50 lakh and ₹1 crore"),
+            Choice(
+                key = TotalIncomeBand.ABOVE_ONE_CRORE.name,
+                label = "More than ₹1 crore",
+                hint = "Schedule AL then wants everything you own and owe as on 31 March."
+            )
         )
     )
 
@@ -213,6 +238,11 @@ object OnboardingQuestions {
                 label = "I earned something abroad, or paid tax abroad"
             ),
             Choice(
+                key = SpecialSituation.FOREIGN_RETIREMENT_ACCOUNT.name,
+                label = "I have a retirement account abroad",
+                hint = "A 401(k), an IRA or a similar account kept in a foreign country. Section 89A lets you defer the tax on it, and from this year that keeps you off the short forms."
+            ),
+            Choice(
                 key = SpecialSituation.CARRIED_FORWARD_LOSS.name,
                 label = "I have a loss to carry to next year, or an old loss to use up",
                 hint = "A loss on shares, property or your business, from this year or an earlier one."
@@ -227,9 +257,19 @@ object OnboardingQuestions {
                 hint = "For example, interest on a deposit in your minor child's name."
             ),
             Choice(
+                key = SpecialSituation.INCOME_APPORTIONED_UNDER_5A.name,
+                label = "My spouse and I split our income under the Goa civil code",
+                hint = "Section 5A, for couples married under the Portuguese Civil Code. Rare, and it rules out the short forms."
+            ),
+            Choice(
+                key = SpecialSituation.UNEXPLAINED_INCOME_AT_SPECIAL_RATE.name,
+                label = "I have income taxed at a flat special rate",
+                hint = "Cash credits, unexplained investments or money surrendered in a survey, taxed at 60% under section 115BBE."
+            ),
+            Choice(
                 key = SpecialSituation.REPRESENTATIVE_ASSESSEE.name,
                 label = "I am filing for someone else",
-                hint = "As a guardian, or for someone who cannot file on their own."
+                hint = "As a guardian, or for someone who cannot file on their own. From AY ${TaxYear.ASSESSMENT_YEAR} this no longer forces a longer form, it only asks for your name, phone and email."
             ),
             Choice(
                 key = SpecialSituation.TDS_UNDER_194N.name,
@@ -247,6 +287,7 @@ object OnboardingQuestions {
         QuestionId.EQUITY_LONG_TERM_GAIN_LIMIT -> equityLongTermGainLimit
         QuestionId.HOUSE_PROPERTY_COUNT -> housePropertyCount
         QuestionId.BUSINESS_KINDS -> businessKinds
+        QuestionId.PRESUMPTIVE_TURNOVER_LIMIT -> presumptiveTurnoverLimit
         QuestionId.AGRICULTURAL_INCOME_LIMIT -> agriculturalIncomeLimit
         QuestionId.TOTAL_INCOME_BAND -> totalIncomeBand
         QuestionId.SPECIAL_SITUATIONS -> specialSituations

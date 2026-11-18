@@ -10,6 +10,7 @@ import com.ashish.filetax.onboarding.model.IncomeSource
 import com.ashish.filetax.onboarding.model.OnboardingAnswers
 import com.ashish.filetax.onboarding.model.ResidentialStatus
 import com.ashish.filetax.onboarding.model.SpecialSituation
+import com.ashish.filetax.onboarding.model.TotalIncomeBand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -117,7 +118,7 @@ class DocumentChecklistTest {
             capitalGainKinds = CapitalGainKind.entries.toSet(),
             businessKinds = BusinessKind.entries.toSet(),
             agriculturalIncomeAboveLimit = true,
-            totalIncomeAboveFiftyLakh = true,
+            totalIncomeBand = TotalIncomeBand.ABOVE_ONE_CRORE,
             specialSituations = SpecialSituation.entries.toSet()
         )
 

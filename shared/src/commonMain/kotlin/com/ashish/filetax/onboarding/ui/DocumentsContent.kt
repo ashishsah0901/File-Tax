@@ -1,36 +1,52 @@
 package com.ashish.filetax.onboarding.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ashish.filetax.onboarding.CollectableDocument
 import com.ashish.filetax.onboarding.OnboardingUiState
 import com.ashish.filetax.onboarding.model.TaxYear
+import com.ashish.filetax.ui.components.AppCard
+import com.ashish.filetax.ui.components.InlineArt
+import filetax.shared.generated.resources.Res
+import filetax.shared.generated.resources.img_round_pushpin
 
 @Composable
 internal fun ColumnScope.DocumentsContent(
     state: OnboardingUiState.Documents,
     onBack: () -> Unit,
     onDocumentToggled: (String) -> Unit,
-    onShowFilingSteps: () -> Unit
+    onShowFilingSteps: () -> Unit,
+    onShowScanner: () -> Unit
 ) {
     Header(
         trailing = "AY ${TaxYear.ASSESSMENT_YEAR}",
@@ -39,7 +55,7 @@ internal fun ColumnScope.DocumentsContent(
     )
     LinearProgressIndicator(
         progress = { state.collectedCount.toFloat() / state.documents.size.toFloat() },
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).height(6.dp)
     )
     Column(
         modifier = Modifier
@@ -66,8 +82,21 @@ internal fun ColumnScope.DocumentsContent(
             modifier = Modifier.padding(top = 8.dp)
         )
         Spacer(Modifier.height(20.dp))
+        val transition = rememberInfiniteTransition(label = "documents")
+        val motion by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 5200, easing = LinearEasing)
+            ),
+            label = "sheen"
+        )
         state.documents.forEach { item ->
-            DocumentCard(item = item, onClick = { onDocumentToggled(item.document.id) })
+            DocumentCard(
+                item = item,
+                motion = { motion },
+                onClick = { onDocumentToggled(item.document.id) }
+            )
         }
         Text(
             text = "Collect these before you open the portal. Filing goes faster when nothing sends you looking mid-way.",
@@ -76,56 +105,95 @@ internal fun ColumnScope.DocumentsContent(
             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
         )
     }
+    OutlinedButton(
+        onClick = onShowScanner,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(top = 12.dp)
+    ) {
+        Text("Read the PDFs I already have")
+    }
     if (state.hasFilingGuide) {
         Button(
             onClick = onShowFilingSteps,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(top = 8.dp, bottom = 12.dp)
         ) {
             Text("How to file it, step by step")
         }
+    } else {
+        Spacer(Modifier.height(12.dp))
     }
 }
 
 @Composable
-private fun DocumentCard(item: CollectableDocument, onClick: () -> Unit) {
-    Surface(
+private fun DocumentCard(item: CollectableDocument, motion: () -> Float, onClick: () -> Unit) {
+    val collected = item.collected
+    val wellColor = if (collected) {
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    AppCard(
         onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = if (item.collected) {
+        color = if (collected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            MaterialTheme.colorScheme.surfaceContainerLow
         },
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        outlined = !collected,
+        modifier = Modifier.padding(bottom = 12.dp)
     ) {
-        Column(modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DocumentIllustration(art = item.document.art)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DocumentIllustration(
+                art = item.document.art,
+                containerColor = wellColor,
+                motion = motion
+            )
+            Column(modifier = Modifier.weight(1f).padding(start = 14.dp, end = 12.dp)) {
                 Text(
                     text = item.document.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp)
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
-                Checkbox(checked = item.collected, onCheckedChange = null)
-            }
-            Text(
-                text = item.document.why,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp, end = 4.dp)
-            )
-            Row(modifier = Modifier.padding(top = 10.dp, end = 4.dp)) {
                 Text(
-                    text = "Where",
+                    text = if (collected) "Collected" else "Tap to tick it off",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                Checkbox(checked = collected, onCheckedChange = null)
+            }
+        }
+        Text(
+            text = item.document.why,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 14.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(wellColor)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            InlineArt(
+                resource = Res.drawable.img_round_pushpin,
+                size = 16.dp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            Column(modifier = Modifier.padding(start = 10.dp)) {
+                Text(
+                    text = "Where to get it",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.width(8.dp))
                 Text(
                     text = item.document.whereToGet,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }

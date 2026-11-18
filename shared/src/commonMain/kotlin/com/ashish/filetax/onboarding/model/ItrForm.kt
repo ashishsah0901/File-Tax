@@ -22,5 +22,6 @@ enum class ItrForm(val label: String, val summary: String) {
 data class ItrRecommendation(
     val form: ItrForm,
     val reasons: List<String>,
-    val alternative: String? = null
+    val alternative: String? = null,
+    val cautions: List<String> = emptyList()
 )

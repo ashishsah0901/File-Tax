@@ -8,6 +8,7 @@ import com.ashish.filetax.onboarding.model.IncomeSource
 import com.ashish.filetax.onboarding.model.OnboardingAnswers
 import com.ashish.filetax.onboarding.model.QuestionId
 import com.ashish.filetax.onboarding.model.ResidentialStatus
+import com.ashish.filetax.onboarding.model.TotalIncomeBand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -73,7 +74,7 @@ class OnboardingFlowTest {
     @Test
     fun flowIsCompleteOnlyWhenEveryApplicableQuestionIsAnswered() {
         val partial = answersWith(IncomeSource.SALARY_PENSION)
-        val complete = partial.copy(totalIncomeAboveFiftyLakh = false, specialSituations = emptySet())
+        val complete = partial.copy(totalIncomeBand = TotalIncomeBand.UP_TO_FIFTY_LAKH, specialSituations = emptySet())
 
         assertFalse(OnboardingFlow.isComplete(partial))
         assertTrue(OnboardingFlow.isComplete(complete))

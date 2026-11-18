@@ -95,6 +95,10 @@ object DocumentChecklist {
             if (SpecialSituation.FOREIGN_INCOME_OR_TAX_RELIEF in situations) {
                 add(DocumentCatalog.foreignTaxProof)
             }
+            if (SpecialSituation.FOREIGN_RETIREMENT_ACCOUNT in situations) {
+                add(DocumentCatalog.foreignAssetDetails)
+                add(DocumentCatalog.foreignTaxProof)
+            }
             if (SpecialSituation.CARRIED_FORWARD_LOSS in situations) {
                 add(DocumentCatalog.lastYearReturn)
             }

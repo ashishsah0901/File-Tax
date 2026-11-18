@@ -12,6 +12,8 @@ import com.ashish.filetax.onboarding.model.ItrForm
 import com.ashish.filetax.onboarding.model.OnboardingAnswers
 import com.ashish.filetax.onboarding.model.ResidentialStatus
 import com.ashish.filetax.onboarding.model.SpecialSituation
+import com.ashish.filetax.onboarding.model.TaxYear
+import com.ashish.filetax.onboarding.model.TotalIncomeBand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,8 +27,11 @@ class FilingGuideTest {
             val steps = FilingGuide.forForm(form, everythingAnswers())
 
             assertTrue(steps.isNotEmpty(), "${form.label} has no steps")
-            assertTrue(steps.first().id.endsWith("_login"))
-            assertTrue(steps.last().id.endsWith("_everify"))
+            assertTrue(steps.first().id.endsWith("_must_you_file"))
+            assertTrue(steps.any { it.id.endsWith("_login") }, "${form.label} never says to log in")
+            assertTrue(steps.any { it.id.endsWith("_pay_tax") }, "${form.label} never says to pay the balance")
+            assertTrue(steps.any { it.id.endsWith("_everify") }, "${form.label} never says to verify")
+            assertTrue(steps.last().id.endsWith("_deadlines"))
         }
     }
 
@@ -179,7 +184,7 @@ class FilingGuideTest {
     private fun answersWith(vararg sources: IncomeSource) = OnboardingAnswers(
         residentialStatus = ResidentialStatus.RESIDENT,
         incomeSources = sources.toSet(),
-        totalIncomeAboveFiftyLakh = false,
+        totalIncomeBand = TotalIncomeBand.UP_TO_FIFTY_LAKH,
         specialSituations = emptySet()
     )
 
@@ -187,10 +192,37 @@ class FilingGuideTest {
         residentialStatus = ResidentialStatus.RESIDENT,
         incomeSources = IncomeSource.entries.toSet(),
         capitalGainKinds = CapitalGainKind.entries.toSet(),
-        housePropertyCount = HousePropertyCount.MORE_THAN_ONE,
+        housePropertyCount = HousePropertyCount.MORE_THAN_TWO,
         businessKinds = BusinessKind.entries.toSet(),
         agriculturalIncomeAboveLimit = true,
-        totalIncomeAboveFiftyLakh = true,
+        totalIncomeBand = TotalIncomeBand.ABOVE_ONE_CRORE,
         specialSituations = SpecialSituation.entries.toSet()
     )
+
+    @Test
+    fun theGuideCarriesThisYearsDates() {
+        val simple = FilingGuide.forForm(ItrForm.ITR1, salariedAnswers())
+            .single { it.id == "itr1_deadlines" }
+        val business = FilingGuide.forForm(ItrForm.ITR3, everythingAnswers())
+            .single { it.id == "itr3_deadlines" }
+
+        assertTrue(simple.detail.contains(TaxYear.DUE_DATE_WITHOUT_BUSINESS))
+        assertTrue(business.detail.contains(TaxYear.DUE_DATE_BUSINESS_WITHOUT_AUDIT))
+        assertTrue(business.detail.contains(TaxYear.DUE_DATE_WITH_AUDIT))
+        listOf(simple, business).forEach { step ->
+            assertTrue(step.detail.contains(TaxYear.BELATED_RETURN_DATE))
+            assertTrue(step.detail.contains(TaxYear.REVISED_RETURN_DATE))
+            assertTrue(step.detail.contains(TaxYear.UPDATED_RETURN_DATE))
+        }
+    }
+
+    @Test
+    fun everyFormSaysWhoHasToFileAtAll() {
+        ItrForm.entries.forEach { form ->
+            val step = FilingGuide.forForm(form, everythingAnswers()).first()
+
+            assertTrue(step.detail.contains("₹4,00,000"), "${form.label} does not give the exemption limit")
+            assertTrue(step.detail.contains("outside India"), "${form.label} misses the foreign asset trigger")
+        }
+    }
 }

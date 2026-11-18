@@ -10,6 +10,7 @@ import com.ashish.filetax.onboarding.model.Question
 import com.ashish.filetax.onboarding.model.QuestionId
 import com.ashish.filetax.onboarding.model.ResidentialStatus
 import com.ashish.filetax.onboarding.model.SpecialSituation
+import com.ashish.filetax.onboarding.model.TotalIncomeBand
 
 object OnboardingFlow {
 
@@ -23,8 +24,9 @@ object OnboardingFlow {
         QuestionId.EQUITY_LONG_TERM_GAIN_LIMIT -> answers.equityLongTermGainWithinExemptLimit != null
         QuestionId.HOUSE_PROPERTY_COUNT -> answers.housePropertyCount != null
         QuestionId.BUSINESS_KINDS -> !answers.businessKinds.isNullOrEmpty()
+        QuestionId.PRESUMPTIVE_TURNOVER_LIMIT -> answers.presumptiveTurnoverAboveLimit != null
         QuestionId.AGRICULTURAL_INCOME_LIMIT -> answers.agriculturalIncomeAboveLimit != null
-        QuestionId.TOTAL_INCOME_BAND -> answers.totalIncomeAboveFiftyLakh != null
+        QuestionId.TOTAL_INCOME_BAND -> answers.totalIncomeBand != null
         QuestionId.SPECIAL_SITUATIONS -> answers.specialSituations != null
     }
 
@@ -44,8 +46,9 @@ object OnboardingFlow {
         QuestionId.EQUITY_LONG_TERM_GAIN_LIMIT -> booleanSelection(answers.equityLongTermGainWithinExemptLimit)
         QuestionId.HOUSE_PROPERTY_COUNT -> setOfNotNull(answers.housePropertyCount?.name)
         QuestionId.BUSINESS_KINDS -> answers.businessKinds.orEmpty().map { it.name }.toSet()
+        QuestionId.PRESUMPTIVE_TURNOVER_LIMIT -> booleanSelection(answers.presumptiveTurnoverAboveLimit)
         QuestionId.AGRICULTURAL_INCOME_LIMIT -> booleanSelection(answers.agriculturalIncomeAboveLimit)
-        QuestionId.TOTAL_INCOME_BAND -> booleanSelection(answers.totalIncomeAboveFiftyLakh)
+        QuestionId.TOTAL_INCOME_BAND -> setOfNotNull(answers.totalIncomeBand?.name)
         QuestionId.SPECIAL_SITUATIONS -> answers.specialSituations.orEmpty().map { it.name }.toSet()
     }
 
@@ -75,12 +78,16 @@ object OnboardingFlow {
                 businessKinds = keys.map(BusinessKind::valueOf).toSet()
             )
 
+            QuestionId.PRESUMPTIVE_TURNOVER_LIMIT -> answers.copy(
+                presumptiveTurnoverAboveLimit = keys.toBoolean()
+            )
+
             QuestionId.AGRICULTURAL_INCOME_LIMIT -> answers.copy(
                 agriculturalIncomeAboveLimit = keys.toBoolean()
             )
 
             QuestionId.TOTAL_INCOME_BAND -> answers.copy(
-                totalIncomeAboveFiftyLakh = keys.toBoolean()
+                totalIncomeBand = keys.firstOrNull()?.let(TotalIncomeBand::valueOf)
             )
 
             QuestionId.SPECIAL_SITUATIONS -> answers.copy(
@@ -105,6 +112,9 @@ object OnboardingFlow {
         if (QuestionId.BUSINESS_KINDS !in applicable) {
             pruned = pruned.copy(businessKinds = null)
         }
+        if (QuestionId.PRESUMPTIVE_TURNOVER_LIMIT !in applicable) {
+            pruned = pruned.copy(presumptiveTurnoverAboveLimit = null)
+        }
         if (QuestionId.AGRICULTURAL_INCOME_LIMIT !in applicable) {
             pruned = pruned.copy(agriculturalIncomeAboveLimit = null)
         }
@@ -125,6 +135,9 @@ object OnboardingFlow {
         }
         if (IncomeSource.BUSINESS_PROFESSION in sources) {
             ids += QuestionId.BUSINESS_KINDS
+            if (answers.hasPresumptiveBusiness()) {
+                ids += QuestionId.PRESUMPTIVE_TURNOVER_LIMIT
+            }
         }
         if (IncomeSource.AGRICULTURE in sources) {
             ids += QuestionId.AGRICULTURAL_INCOME_LIMIT

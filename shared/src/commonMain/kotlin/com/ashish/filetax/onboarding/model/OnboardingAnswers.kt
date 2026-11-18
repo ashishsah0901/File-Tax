@@ -28,7 +28,14 @@ enum class CapitalGainKind {
 
 enum class HousePropertyCount {
     ONE,
-    MORE_THAN_ONE
+    TWO,
+    MORE_THAN_TWO
+}
+
+enum class TotalIncomeBand {
+    UP_TO_FIFTY_LAKH,
+    FIFTY_LAKH_TO_ONE_CRORE,
+    ABOVE_ONE_CRORE
 }
 
 enum class BusinessKind(val isPresumptive: Boolean) {
@@ -45,9 +52,12 @@ enum class SpecialSituation {
     UNLISTED_SHARES,
     FOREIGN_ASSETS_OR_ACCOUNTS,
     FOREIGN_INCOME_OR_TAX_RELIEF,
+    FOREIGN_RETIREMENT_ACCOUNT,
     CARRIED_FORWARD_LOSS,
     DEFERRED_ESOP_TAX,
     CLUBBED_INCOME,
+    INCOME_APPORTIONED_UNDER_5A,
+    UNEXPLAINED_INCOME_AT_SPECIAL_RATE,
     REPRESENTATIVE_ASSESSEE,
     TDS_UNDER_194N
 }
@@ -61,8 +71,9 @@ data class OnboardingAnswers(
     val equityLongTermGainWithinExemptLimit: Boolean? = null,
     val housePropertyCount: HousePropertyCount? = null,
     val businessKinds: Set<BusinessKind>? = null,
+    val presumptiveTurnoverAboveLimit: Boolean? = null,
     val agriculturalIncomeAboveLimit: Boolean? = null,
-    val totalIncomeAboveFiftyLakh: Boolean? = null,
+    val totalIncomeBand: TotalIncomeBand? = null,
     val specialSituations: Set<SpecialSituation>? = null
 ) {
     fun has(source: IncomeSource): Boolean = incomeSources?.contains(source) == true
@@ -70,4 +81,10 @@ data class OnboardingAnswers(
     fun has(situation: SpecialSituation): Boolean = specialSituations?.contains(situation) == true
 
     fun has(kind: BusinessKind): Boolean = businessKinds?.contains(kind) == true
+
+    fun aboveFiftyLakh(): Boolean = totalIncomeBand != null && totalIncomeBand != TotalIncomeBand.UP_TO_FIFTY_LAKH
+
+    fun aboveOneCrore(): Boolean = totalIncomeBand == TotalIncomeBand.ABOVE_ONE_CRORE
+
+    fun hasPresumptiveBusiness(): Boolean = businessKinds.orEmpty().any { it.isPresumptive }
 }

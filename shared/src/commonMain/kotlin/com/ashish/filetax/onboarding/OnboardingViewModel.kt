@@ -4,6 +4,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.ashish.filetax.documents.logic.AnswersFromDocuments
+import com.ashish.filetax.documents.logic.DocumentFinding
+import com.ashish.filetax.documents.logic.ScanReportBuilder
+import com.ashish.filetax.documents.model.DetailEntry
+import com.ashish.filetax.documents.model.ReportEntry
+import com.ashish.filetax.documents.model.ParsedDocument
 import com.ashish.filetax.onboarding.data.OnboardingRepository
 import com.ashish.filetax.onboarding.logic.DocumentChecklist
 import com.ashish.filetax.onboarding.logic.FilingGuide
@@ -29,7 +35,11 @@ sealed interface OnboardingUiState {
         val isLastStep: Boolean
     ) : OnboardingUiState
 
-    data class Result(val recommendation: ItrRecommendation) : OnboardingUiState
+    data class Result(
+        val recommendation: ItrRecommendation,
+        val documentFindings: List<DocumentFinding>,
+        val estimatedTotalIncome: Long?
+    ) : OnboardingUiState
 
     data class Documents(
         val form: ItrForm,
@@ -38,10 +48,16 @@ sealed interface OnboardingUiState {
         val hasFilingGuide: Boolean
     ) : OnboardingUiState
 
+    data class Scanning(val checklist: List<TaxDocument>) : OnboardingUiState
+
+    data object Privacy : OnboardingUiState
+
     data class FilingSteps(
         val form: ItrForm,
         val steps: List<TrackableStep>,
-        val completedCount: Int
+        val completedCount: Int,
+        val currentIndex: Int,
+        val hasDocuments: Boolean
     ) : OnboardingUiState
 }
 
@@ -53,7 +69,9 @@ data class CollectableDocument(
 data class TrackableStep(
     val step: FilingStep,
     val documents: List<TaxDocument>,
-    val completed: Boolean
+    val completed: Boolean,
+    val values: List<ReportEntry>,
+    val details: List<DetailEntry>
 )
 
 class OnboardingViewModel(private val repository: OnboardingRepository) : ViewModel() {
@@ -63,6 +81,11 @@ class OnboardingViewModel(private val repository: OnboardingRepository) : ViewMo
     private var showingResult by mutableStateOf(false)
     private var showingDocuments by mutableStateOf(false)
     private var showingFilingSteps by mutableStateOf(false)
+    private var showingScan by mutableStateOf(false)
+    private var showingPrivacy by mutableStateOf(false)
+    private var documentFindings by mutableStateOf<List<DocumentFinding>>(emptyList())
+    private var parsedDocuments by mutableStateOf<List<ParsedDocument>>(emptyList())
+    private var estimatedTotalIncome by mutableStateOf<Long?>(null)
     private var collectedDocuments by mutableStateOf(repository.loadCollectedDocuments())
     private var completedSteps by mutableStateOf(repository.loadCompletedSteps())
 
@@ -78,20 +101,34 @@ class OnboardingViewModel(private val repository: OnboardingRepository) : ViewMo
     val uiState: OnboardingUiState
         get() {
             val questions = OnboardingFlow.questions(answers)
+            if (showingPrivacy) {
+                return OnboardingUiState.Privacy
+            }
+            if (showingScan) {
+                return OnboardingUiState.Scanning(DocumentChecklist.forAnswers(answers))
+            }
             if (showingFilingSteps) {
                 val form = ItrFormDeterminer.determine(answers).form
                 val checklist = DocumentChecklist.forAnswers(answers).associateBy { it.id }
+                val report = parsedDocuments.takeIf { it.isNotEmpty() }?.let {
+                    ScanReportBuilder.build(it, checklist.values.toList())
+                }
                 val steps = FilingGuide.forForm(form, answers).map { step ->
+                    val sections = report?.sections.orEmpty().filter { it.schedule in step.schedules }
                     TrackableStep(
                         step = step,
                         documents = step.documentIds.mapNotNull(checklist::get),
-                        completed = step.id in completedSteps
+                        completed = step.id in completedSteps,
+                        values = sections.flatMap { it.entries },
+                        details = sections.flatMap { it.details }
                     )
                 }
                 return OnboardingUiState.FilingSteps(
                     form = form,
                     steps = steps,
-                    completedCount = steps.count { it.completed }
+                    completedCount = steps.count { it.completed },
+                    currentIndex = steps.indexOfFirst { !it.completed }.takeIf { it >= 0 } ?: steps.size,
+                    hasDocuments = parsedDocuments.isNotEmpty()
                 )
             }
             if (showingDocuments) {
@@ -107,7 +144,11 @@ class OnboardingViewModel(private val repository: OnboardingRepository) : ViewMo
                 )
             }
             if (showingResult) {
-                return OnboardingUiState.Result(ItrFormDeterminer.determine(answers))
+                return OnboardingUiState.Result(
+                    recommendation = ItrFormDeterminer.determine(answers),
+                    documentFindings = documentFindings,
+                    estimatedTotalIncome = estimatedTotalIncome
+                )
             }
             val index = cursor.coerceIn(0, questions.lastIndex)
             val question = questions[index]
@@ -159,6 +200,33 @@ class OnboardingViewModel(private val repository: OnboardingRepository) : ViewMo
         showingFilingSteps = true
     }
 
+    fun onShowScanner() {
+        showingScan = true
+    }
+
+    fun onShowPrivacy() {
+        showingPrivacy = true
+    }
+
+    fun onUseDocuments(documents: List<ParsedDocument>) {
+        parsedDocuments = documents
+        val inferred = AnswersFromDocuments.infer(documents, answers)
+        answers = inferred.answers
+        repository.save(inferred.answers)
+        documentFindings = inferred.findings
+        estimatedTotalIncome = inferred.estimatedTotalIncome
+        showingScan = false
+        showingDocuments = false
+        showingFilingSteps = false
+        if (OnboardingFlow.isComplete(inferred.answers)) {
+            showingResult = true
+            cursor = OnboardingFlow.questions(inferred.answers).lastIndex.coerceAtLeast(0)
+        } else {
+            showingResult = false
+            cursor = OnboardingFlow.firstUnansweredIndex(inferred.answers)
+        }
+    }
+
     fun onDocumentToggled(id: String) {
         val updated = if (id in collectedDocuments) collectedDocuments - id else collectedDocuments + id
         collectedDocuments = updated
@@ -172,7 +240,11 @@ class OnboardingViewModel(private val repository: OnboardingRepository) : ViewMo
     }
 
     fun onBack() {
-        if (showingFilingSteps) {
+        if (showingPrivacy) {
+            showingPrivacy = false
+        } else if (showingScan) {
+            showingScan = false
+        } else if (showingFilingSteps) {
             showingFilingSteps = false
         } else if (showingDocuments) {
             showingDocuments = false
@@ -193,6 +265,11 @@ class OnboardingViewModel(private val repository: OnboardingRepository) : ViewMo
         showingResult = false
         showingDocuments = false
         showingFilingSteps = false
+        showingScan = false
+        showingPrivacy = false
+        documentFindings = emptyList()
+        estimatedTotalIncome = null
+        parsedDocuments = emptyList()
     }
 
     private fun currentQuestion(): Question? =
